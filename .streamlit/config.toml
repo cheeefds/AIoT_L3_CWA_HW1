@@ -1,0 +1,39 @@
+# 依 Streamlit Fluent 主題範本調整的天氣 Dashboard 主題。
+[theme]
+base = "light"
+primaryColor = "#0067B8"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F8FB"
+codeBackgroundColor = "#EEF4F8"
+textColor = "#17212B"
+linkColor = "#0067B8"
+borderColor = "#D7E3EC"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "12px"
+buttonRadius = "8px"
+font = "'Segoe UI', 'Noto Sans TC', sans-serif"
+codeFont = "monospace"
+baseFontSize = 15
+baseFontWeight = 400
+headingFontSizes = ["32px", "25px", "20px", "17px", "15px", "13px"]
+headingFontWeights = [650, 600, 600, 600, 600, 600]
+linkUnderline = false
+chartCategoricalColors = ["#0067B8", "#D83B01", "#107C10", "#8764B8", "#00A4B4", "#C239B3", "#737373"]
+blueColor = "#0067B8"
+greenColor = "#107C10"
+redColor = "#C42B1C"
+yellowColor = "#986F0B"
+orangeColor = "#D83B01"
+violetColor = "#744DA9"
+grayColor = "#5D6B78"
+dataframeBorderColor = "#D7E3EC"
+dataframeHeaderBackgroundColor = "#EEF4F8"
+
+[theme.sidebar]
+backgroundColor = "#F4F8FB"
+secondaryBackgroundColor = "#E8F1F7"
+codeBackgroundColor = "#E1ECF3"
+textColor = "#17212B"
+borderColor = "#D7E3EC"
+primaryColor = "#0067B8"
