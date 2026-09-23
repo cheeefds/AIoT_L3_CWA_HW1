@@ -2,6 +2,9 @@
 
 本文件詳細展示 Taiwan Weather Forecast Dashboard 的系統架構、資料處理管線（ETL）、模組互動時序與各階段的核心工作流程。
 
+> 📚 **系統技術設計規格書請參閱：[../design.md](../design.md)**  
+> 📖 **快速上手指南與流程總覽請參閱：[../README.md](../README.md)**
+
 ---
 
 ## 1. 總體系統架構圖 (Architecture Overview)

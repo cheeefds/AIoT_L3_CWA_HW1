@@ -8,7 +8,8 @@
 
 系統核心遵循完整的 ETL 與 AI 增強管線。
 
-> 📊 **完整流程圖、Mermaid 架構圖、時序圖與資料表設計已獨立整理於：[myplane/workflow.md](myplane/workflow.md)**
+> 📚 **系統技術設計規格書請參閱：[design.md](design.md)**  
+> 📊 **完整流程圖、Mermaid 架構圖、時序圖與資料表設計請參閱：[myplane/workflow.md](myplane/workflow.md)**
 
 ```text
 CWA Open Data (F-D0047-091)
