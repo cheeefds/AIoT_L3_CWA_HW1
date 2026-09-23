@@ -141,7 +141,13 @@ CREATE TABLE IF NOT EXISTS WeatherForecasts (
 
 ### 4.1 儀表板執行方式
 ```powershell
+# 方式 A：先啟用虛擬環境（最推薦，終端機提示符前方會出現 (.venv)）
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
 streamlit run app.py
+
+# 方式 B：直接呼叫虛擬環境 Python 執行（無需先手動 Activate）
+.\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
 ### 4.2 核心視覺化與互動功能
@@ -224,3 +230,6 @@ python -m pytest -q
   * 某些開源模型可能因 Hugging Face 伺服器忙碌中或免費額度受限，系統會自動切換至備援模型；您亦可在 `.env` 中指定 `HF_MODEL=其他模型`。
 * **Q5: PowerShell 執行時出現腳本存取被拒錯誤？**
   * 請在 PowerShell 視窗執行 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` 後再啟用虛擬環境。
+* **Q6: 執行時出現「無法辨識 'streamlit' 詞彙」？**
+  * 代表當前終端機尚未啟用虛擬環境，系統 PATH 找不到套件執行檔。
+  * 請先執行 `.\.venv\Scripts\Activate.ps1` 啟用虛擬環境，或直接改用 `.\.venv\Scripts\python.exe -m streamlit run app.py` 啟動。

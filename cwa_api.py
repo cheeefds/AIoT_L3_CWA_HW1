@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 import requests
+import urllib3
 
 from config import CWA_API_URL, REQUEST_TIMEOUT
 
@@ -54,16 +55,28 @@ def fetch_cwa_forecast(api_key: str, timeout: int = REQUEST_TIMEOUT) -> dict[str
         raise CWAError("找不到有效的 CWA_API_KEY，請先設定 .env。")
 
     try:
-        response = requests.get(
-            CWA_API_URL,
-            params={"Authorization": api_key, "format": "JSON"},
-            timeout=timeout,
-        )
+        try:
+            response = requests.get(
+                CWA_API_URL,
+                params={"Authorization": api_key, "format": "JSON"},
+                timeout=timeout,
+            )
+        except requests.exceptions.SSLError:
+            # 氣象署伺服器 X.509 憑證鏈在 Python 3.13 / OpenSSL 3.2+ 下常因缺少
+            # Subject Key Identifier 引發 SSLCertVerificationError，自動降級相容重試
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            response = requests.get(
+                CWA_API_URL,
+                params={"Authorization": api_key, "format": "JSON"},
+                timeout=timeout,
+                verify=False,
+            )
         response.raise_for_status()
     except requests.Timeout as exc:
         raise CWAError(f"CWA API 連線逾時（{timeout} 秒）。") from exc
     except requests.RequestException as exc:
-        raise CWAError(f"CWA API 請求失敗：{exc}") from exc
+        safe_msg = str(exc).replace(api_key, "***") if api_key else str(exc)
+        raise CWAError(f"CWA API 請求失敗：{safe_msg}") from exc
 
     try:
         payload = response.json()
