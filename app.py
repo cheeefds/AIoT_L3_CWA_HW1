@@ -13,7 +13,16 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 from ai_service import WeatherAIError, generate_weather_advice
-from config import CWA_API_KEY, CWA_DATASET_ID, DATABASE_PATH, HF_MODEL, HF_TOKEN
+from config import (
+    CWA_API_KEY,
+    CWA_DATASET_ID,
+    DATABASE_PATH,
+    HF_MODEL,
+    HF_TOKEN,
+    get_cwa_api_key,
+    get_hf_model,
+    get_hf_token,
+)
 from cwa_api import CWAError, download_forecast_dataframe
 from database import (
     DatabaseError,
@@ -203,13 +212,15 @@ def main() -> None:
         )
         st.caption(f"資料庫更新時間：{database_updated_at()}")
 
+    active_cwa_key = get_cwa_api_key() or CWA_API_KEY
+
     if update_clicked:
         try:
             with st.status(
                 "正在更新中央氣象署預報…",
                 expanded=True,
             ) as update_status:
-                fresh_data = download_forecast_dataframe(CWA_API_KEY)
+                fresh_data = download_forecast_dataframe(active_cwa_key)
                 insert_forecasts(fresh_data)
                 update_status.update(
                     label=f"更新完成，共處理 {len(fresh_data):,} 筆預報",
@@ -224,12 +235,12 @@ def main() -> None:
 
     if not regions:
         st.info(
-            "資料庫目前沒有天氣資料。請先在 `.env` 設定 CWA_API_KEY，"
+            "資料庫目前沒有天氣資料。請先在 `.env` 或 Streamlit 雲端設定之 Secrets 設定 CWA_API_KEY，"
             "再按左側的「更新天氣資料」。",
             icon=":material/info:",
         )
-        if not CWA_API_KEY or CWA_API_KEY.lower().startswith(("your_", "your")):
-            st.warning("尚未偵測到有效的 CWA_API_KEY。", icon=":material/key_off:")
+        if not active_cwa_key or active_cwa_key.lower().startswith(("your_", "your")):
+            st.warning("尚未偵測到有效的 CWA_API_KEY（請確認 .env 或 Streamlit Secrets）。", icon=":material/key_off:")
         st.stop()
 
     with st.sidebar:
@@ -371,12 +382,15 @@ def main() -> None:
         )
 
     # AI 可能需要較久，因此先建立位置，等其他區塊完成後再填入內容。
+    active_hf_token = get_hf_token() or HF_TOKEN
+    active_hf_model = get_hf_model() or HF_MODEL
+
     with ai_card:
         st.subheader("AI 天氣建議", icon=":material/auto_awesome:")
         st.caption(f"根據 {selected_region} {selected_date} {selected_period} 的預報產生")
-        if not HF_TOKEN or HF_TOKEN.lower().startswith(("your_", "your")):
+        if not active_hf_token or active_hf_token.lower().startswith(("your_", "your")):
             st.warning(
-                "尚未設定有效的 HF_TOKEN。",
+                "尚未設定有效的 HF_TOKEN（請確認 .env 或 Streamlit Secrets）。",
                 icon=":material/key_off:",
             )
         else:
@@ -386,7 +400,7 @@ def main() -> None:
             ])
             try:
                 with st.skeleton(height=180):
-                    advice = cached_ai_advice(weather_items, HF_TOKEN, HF_MODEL)
+                    advice = cached_ai_advice(weather_items, active_hf_token, active_hf_model)
                 st.markdown(advice)
             except WeatherAIError as exc:
                 st.warning(

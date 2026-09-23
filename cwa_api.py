@@ -52,7 +52,7 @@ class CWAError(RuntimeError):
 def fetch_cwa_forecast(api_key: str, timeout: int = REQUEST_TIMEOUT) -> dict[str, Any]:
     """下載 CWA 一週縣市預報 JSON。"""
     if not api_key or api_key.startswith("YOUR_") or api_key.startswith("your_"):
-        raise CWAError("找不到有效的 CWA_API_KEY，請先設定 .env。")
+        raise CWAError("找不到有效的 CWA_API_KEY，請先在 .env 或 Streamlit Secrets 中設定。")
 
     try:
         try:

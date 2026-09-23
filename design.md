@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS WeatherForecasts (
   系統預設先嘗試標準驗證；若遇憑證結構缺失引發之 `SSLError`，自動降級相容重試，兼顧安全性與環境相容性。
 
 ### 4.2 金鑰與隱私安全架構
-1. **設定隔離**：`CWA_API_KEY` 與 `HF_TOKEN` 僅由根目錄 `.env` 讀取，禁止寫死於原始碼。
+1. **設定隔離與雙模支援**：`CWA_API_KEY` 與 `HF_TOKEN` 優先由 `.env` 或 Streamlit Community Cloud 之 `st.secrets` 動態讀取，禁止寫死於原始碼。
 2. **版本控制防護**：`.env` 與 `data.db` 納入 `.gitignore`，確保不被提交至遠端儲存庫。
 3. **除錯遮蔽**：在發生 `requests.RequestException` 時，透過字串替換將 URL 中的 `Authorization` 數值過濾為 `***`，避免於日誌或 Streamlit 介面中洩漏真實金鑰。
 

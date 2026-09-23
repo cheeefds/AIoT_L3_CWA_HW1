@@ -49,7 +49,7 @@ def generate_weather_advice(
 ) -> str:
     """呼叫 Hugging Face Chat Completion；模型不可用時自動嘗試備援。"""
     if not token or token.startswith("YOUR_") or token.startswith("your_"):
-        raise WeatherAIError("找不到有效的 HF_TOKEN，請先設定 .env。")
+        raise WeatherAIError("找不到有效的 HF_TOKEN，請先在 .env 或 Streamlit Secrets 中設定。")
 
     models = list(dict.fromkeys((model, *fallback_models)))
     unavailable_models: list[str] = []

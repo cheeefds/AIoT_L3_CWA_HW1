@@ -84,6 +84,20 @@ HF_TOKEN=你的_Hugging_Face_Token
 * **HF_TOKEN**：至 [Hugging Face Token Settings](https://huggingface.co/settings/tokens) 建立一個具備 Inference Providers 讀取權限的 Token。
 * **資安防護規範**：`.env` 與本機資料庫 `data.db` 已嚴格列入 `.gitignore`，請勿將真實 Token 提交至 Git 版本庫。
 
+### 1.3 雲端部署金鑰設定 (Streamlit Community Cloud)
+
+當您將專案部署至 Streamlit Community Cloud 時，由於 `.env` 未被 Git 追蹤，需透過 Streamlit 後台的 **Secrets** 機制注入金鑰：
+
+1. 進入 [Streamlit Community Cloud 儀表板](https://share.streamlit.io/) 並點選您的 App。
+2. 點擊右下角或側邊選單中的 **Settings** → 選擇 **Secrets** 分頁。
+3. 貼上以下 TOML 格式設定（程式已內建相容 `st.secrets` 讀取機制）：
+   ```toml
+   CWA_API_KEY = "你的中央氣象署授權碼"
+   HF_TOKEN = "你的_Hugging_Face_Token"
+   HF_MODEL = "Qwen/Qwen3.5-9B"
+   ```
+4. 點擊 **Save** 儲存，回到頁面點選「更新天氣資料」即可正常運作。
+
 ---
 
 ## Part 2：CWA 氣象資料擷取與 JSON 解析 (API Fetching & Parsing)
@@ -236,3 +250,6 @@ python -m pytest -q
 * **Q6: 執行時出現「無法辨識 'streamlit' 詞彙」？**
   * 代表當前終端機尚未啟用虛擬環境，系統 PATH 找不到套件執行檔。
   * 請先執行 `.\.venv\Scripts\Activate.ps1` 啟用虛擬環境，或直接改用 `.\.venv\Scripts\python.exe -m streamlit run app.py` 啟動。
+* **Q7: 部署到 Streamlit Community Cloud 上收不到 API Key？**
+  * 因 `.env` 受到 `.gitignore` 保護未上傳至 GitHub，雲端執行時請至 Streamlit Cloud 管理後台點擊 **Settings → Secrets**。
+  * 貼上 `CWA_API_KEY = "..."` 與 `HF_TOKEN = "..."` 後儲存即可。程式已內建自動由 `st.secrets` 讀取金鑰。
