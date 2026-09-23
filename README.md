@@ -1,5 +1,8 @@
 # Taiwan Weather Forecast 台灣天氣預報儀表板
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://aiotl3cwahw1-aqsmuhcvaealtr7xgljcwc.streamlit.app/)
+> 🌐 **線上體驗 (Live Demo)**：[https://aiotl3cwahw1-aqsmuhcvaealtr7xgljcwc.streamlit.app/](https://aiotl3cwahw1-aqsmuhcvaealtr7xgljcwc.streamlit.app/)
+
 這是一個可直接執行的台灣天氣預報 Dashboard。系統從中央氣象署（CWA）取得即時預報 JSON 資料，經過清理轉換為標準化 Pandas DataFrame 並寫入 SQLite 資料庫持久化，最後以 Streamlit 呈現多維度圖表、互動地圖與 Hugging Face 生成式 AI 天氣生活建議。
 
 ![Taiwan Weather Forecast 儀表板預覽](assets/dashboard_preview.png)
@@ -85,6 +88,9 @@ HF_TOKEN=你的_Hugging_Face_Token
 * **資安防護規範**：`.env` 與本機資料庫 `data.db` 已嚴格列入 `.gitignore`，請勿將真實 Token 提交至 Git 版本庫。
 
 ### 1.3 雲端部署金鑰設定 (Streamlit Community Cloud)
+
+本專案已部署於 Streamlit Community Cloud：
+👉 **線上正式版**：[https://aiotl3cwahw1-aqsmuhcvaealtr7xgljcwc.streamlit.app/](https://aiotl3cwahw1-aqsmuhcvaealtr7xgljcwc.streamlit.app/)
 
 當您將專案部署至 Streamlit Community Cloud 時，由於 `.env` 未被 Git 追蹤，需透過 Streamlit 後台的 **Secrets** 機制注入金鑰：
 
