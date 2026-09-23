@@ -6,38 +6,23 @@
 
 ## 系統架構與資料流 (System Architecture)
 
-系統核心遵循完整的 ETL 與 AI 增強管線：
+系統核心遵循完整的 ETL 與 AI 增強管線。
+
+> 📊 **完整流程圖、Mermaid 架構圖、時序圖與資料表設計已獨立整理於：[myplane/workflow.md](myplane/workflow.md)**
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│ Part 2: CWA 氣象資料擷取與 JSON 解析 (cwa_api.py)                 │
-│ 中央氣象署開放資料 API (Dataset: F-D0047-091 一週預報)             │
-│      ↓ HTTP GET (JSON 格式)                                     │
-│ 欄位對齊、缺失值容錯、大小寫相容 → 標準化 Pandas DataFrame         │
-└───────────────────────────────┬─────────────────────────────────┘
-                                ↓
-┌───────────────────────────────┴─────────────────────────────────┐
-│ Part 3: SQLite 資料庫持久化與去重 (database.py)                  │
-│ 自動初始化 data.db / WeatherForecasts 資料表                    │
-│ 依 (regionName, startTime, endTime) 唯一約束                    │
-│ 執行 Upsert 冪等更新 (ON CONFLICT ... DO UPDATE)                │
-└───────────────────────────────┬─────────────────────────────────┘
-                                ↓
-┌───────────────────────────────┴─────────────────────────────────┐
-│ Part 4: Streamlit 互動儀表板與視覺化 (app.py)                   │
-│ ├─ 側邊欄篩選：全台縣市、預報日期、日夜時段切換                  │
-│ ├─ KPI 關鍵指標：最高溫、最低溫、降雨機率、相對濕度              │
-│ ├─ Altair 趨勢圖：溫度區間帶 (Band) 與高低溫折線                │
-│ └─ Folium 地圖：各縣市平均溫度顏色標記 (藍/綠/橘/紅)             │
-└───────────────────────────────┬─────────────────────────────────┘
-                                ↓
-┌───────────────────────────────┴─────────────────────────────────┐
-│ Part 5: Hugging Face AI 智慧天氣建議 (ai_service.py)            │
-│ 結構化 Prompt 模板工程 → 呼叫 InferenceClient                   │
-│ 預設模型 Qwen/Qwen3.5-9B (關閉 thinking 節省 token)             │
-│ 支援 3 階段 Fallback 備援 (gpt-oss-20b / gemma-3-27b)           │
-│ 輸出：穿著建議、雨具提示、戶外活動指南 (繁體中文 100~200 字)     │
-└─────────────────────────────────────────────────────────────────┘
+CWA Open Data (F-D0047-091)
+          ↓ (Part 2: 氣象資料擷取與 JSON 解析)
+       cwa_api.py → 標準化 DataFrame
+          ↓ (Part 3: SQLite 資料庫持久化與去重)
+       database.py ↔ data.db (WeatherForecasts)
+          ↓ (Part 4: 前端互動視覺化)
+       app.py (Streamlit)
+       ├─ KPI 關鍵指標
+       ├─ Altair 溫度區間圖
+       ├─ Folium 台灣氣象地圖
+       └─ (Part 5: Hugging Face AI 智慧生活建議)
+          ai_service.py → Qwen/Qwen3.5-9B (Fallback 備援機制)
 ```
 
 ---
