@@ -2,6 +2,8 @@
 
 這是一個可直接執行的台灣天氣預報 Dashboard。系統從中央氣象署（CWA）取得即時預報 JSON 資料，經過清理轉換為標準化 Pandas DataFrame 並寫入 SQLite 資料庫持久化，最後以 Streamlit 呈現多維度圖表、互動地圖與 Hugging Face 生成式 AI 天氣生活建議。
 
+![Taiwan Weather Forecast 儀表板預覽](assets/dashboard_preview.png)
+
 ---
 
 ## 系統架構與資料流 (System Architecture)
