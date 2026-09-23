@@ -1,91 +1,134 @@
-# Taiwan Weather Forecast
+# Taiwan Weather Forecast 台灣天氣預報儀表板
 
-這是一個可直接執行的台灣天氣預報 Dashboard。系統從中央氣象署（CWA）取得真實預報 JSON，整理成 Pandas DataFrame、寫入 SQLite，再以 Streamlit 顯示圖表、資料表、地圖與 Hugging Face AI 生活建議。
+這是一個可直接執行的台灣天氣預報 Dashboard。系統從中央氣象署（CWA）取得即時預報 JSON 資料，經過清理轉換為標準化 Pandas DataFrame 並寫入 SQLite 資料庫持久化，最後以 Streamlit 呈現多維度圖表、互動地圖與 Hugging Face 生成式 AI 天氣生活建議。
 
-## 系統架構
+---
+
+## 系統架構與資料流 (System Architecture)
+
+系統核心遵循完整的 ETL 與 AI 增強管線：
 
 ```text
-CWA Open Data (F-D0047-091)
-          ↓ JSON
-       cwa_api.py
-          ↓ DataFrame
-       database.py → data.db / SQL 查詢
-          ↓
-       app.py (Streamlit)
-       ├─ Altair 溫度區間圖
-       ├─ Folium 台灣地圖
-       └─ ai_service.py → Hugging Face Inference Providers
+┌─────────────────────────────────────────────────────────────────┐
+│ Part 2: CWA 氣象資料擷取與 JSON 解析 (cwa_api.py)                 │
+│ 中央氣象署開放資料 API (Dataset: F-D0047-091 一週預報)             │
+│      ↓ HTTP GET (JSON 格式)                                     │
+│ 欄位對齊、缺失值容錯、大小寫相容 → 標準化 Pandas DataFrame         │
+└───────────────────────────────┬─────────────────────────────────┘
+                                ↓
+┌───────────────────────────────┴─────────────────────────────────┐
+│ Part 3: SQLite 資料庫持久化與去重 (database.py)                  │
+│ 自動初始化 data.db / WeatherForecasts 資料表                    │
+│ 依 (regionName, startTime, endTime) 唯一約束                    │
+│ 執行 Upsert 冪等更新 (ON CONFLICT ... DO UPDATE)                │
+└───────────────────────────────┬─────────────────────────────────┘
+                                ↓
+┌───────────────────────────────┴─────────────────────────────────┐
+│ Part 4: Streamlit 互動儀表板與視覺化 (app.py)                   │
+│ ├─ 側邊欄篩選：全台縣市、預報日期、日夜時段切換                  │
+│ ├─ KPI 關鍵指標：最高溫、最低溫、降雨機率、相對濕度              │
+│ ├─ Altair 趨勢圖：溫度區間帶 (Band) 與高低溫折線                │
+│ └─ Folium 地圖：各縣市平均溫度顏色標記 (藍/綠/橘/紅)             │
+└───────────────────────────────┬─────────────────────────────────┘
+                                ↓
+┌───────────────────────────────┴─────────────────────────────────┐
+│ Part 5: Hugging Face AI 智慧天氣建議 (ai_service.py)            │
+│ 結構化 Prompt 模板工程 → 呼叫 InferenceClient                   │
+│ 預設模型 Qwen/Qwen3.5-9B (關閉 thinking 節省 token)             │
+│ 支援 3 階段 Fallback 備援 (gpt-oss-20b / gemma-3-27b)           │
+│ 輸出：穿著建議、雨具提示、戶外活動指南 (繁體中文 100~200 字)     │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## 1. 安裝 Python 與建立環境
+---
 
-建議使用 Python 3.10～3.12。先安裝 [Python](https://www.python.org/downloads/)，並在本專案目錄開啟 PowerShell：
+## 工作流程總覽 (Workflow Overview)
+
+| 階段 | 核心主題 | 負責模組 / 檔案 | 核心技術與重點職責 |
+| :--- | :--- | :--- | :--- |
+| **Part 1** | **環境建置與設定** | `requirements.txt`, `.env` | Python 虛擬環境建立、API 金鑰配置與安全隔離 |
+| **Part 2** | **氣象資料擷取與解析** | `cwa_api.py` | 串接 CWA REST API、JSON 巢狀解析、容錯對齊輸出 DataFrame |
+| **Part 3** | **資料庫持久化與去重** | `database.py`, `data.db` | SQLite 自動建表、複合唯一鍵約束、Upsert 冪等去重寫入 |
+| **Part 4** | **互動儀表板與視覺化** | `app.py`, `.streamlit/` | Streamlit 響應式 UI、Altair 區間圖表、Folium 氣溫分佈地圖 |
+| **Part 5** | **生成式 AI 生活建議** | `ai_service.py` | 結構化 Prompt、Qwen-9B、多層 Fallback 備援與錯誤隔離 |
+| **Part 6** | **系統執行與自動化測試** | `tests/test_pipeline.py` | pytest 單元測試、Mock 離線驗證、端到端 (E2E) 流程走測 |
+| **Part 7** | **常見問題與排查** | 常見 FAQ | 401/403 授權失敗、連線逾時、HF 額度不足等故障排除 |
+
+---
+
+## Part 1：環境建置與 API 金鑰設定 (Environment & Configuration)
+
+本專案建議使用 **Python 3.10 ~ 3.12** 環境執行。
+
+### 1.1 建立 Python 虛擬環境與安裝依賴
+
+在專案根目錄開啟 PowerShell，依序執行下列指令建立獨立環境：
 
 ```powershell
+# 1. 建立虛擬環境
 python -m venv .venv
+
+# 2. 啟用虛擬環境 (若遇到腳本限制，先執行 Bypass)
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
+
+# 3. 升級 pip 並安裝專案套件
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-若 PowerShell 阻擋啟用腳本，可在目前視窗執行：
+### 1.2 設定 API 金鑰與環境變數
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
-
-## 2. 設定 API Key
-
-專案已附 `.env.example`。把它複製成 `.env`：
+專案內建 `.env.example` 樣板，複製並建立正式 `.env` 檔案：
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-編輯 `.env`：
+開啟 `.env` 並填入您的金鑰資訊：
 
 ```dotenv
 CWA_API_KEY=你的中央氣象署授權碼
 HF_TOKEN=你的_Hugging_Face_Token
 ```
 
-- CWA Key：至 [中央氣象署開放資料平臺](https://opendata.cwa.gov.tw/) 註冊並取得授權碼。
-- HF Token：至 [Hugging Face Token 設定](https://huggingface.co/settings/tokens) 建立 fine-grained token，允許呼叫 Inference Providers。
-- `.env` 與 `data.db` 已列入 `.gitignore`，不會被 Git 追蹤；`.env.example` 只放示意值。
+* **CWA_API_KEY**：至 [中央氣象署開放資料平臺](https://opendata.cwa.gov.tw/) 免費註冊會員，於「個人設定」取得 API 授權碼。
+* **HF_TOKEN**：至 [Hugging Face Token Settings](https://huggingface.co/settings/tokens) 建立一個具備 Inference Providers 讀取權限的 Token。
+* **資安防護規範**：`.env` 與本機資料庫 `data.db` 已嚴格列入 `.gitignore`，請勿將真實 Token 提交至 Git 版本庫。
 
-## 3. 執行
+---
 
-```powershell
-streamlit run app.py
-```
+## Part 2：CWA 氣象資料擷取與 JSON 解析 (API Fetching & Parsing)
 
-第一次進入時資料庫是空的。確認 `.env` 已設定後，按畫面上的「更新天氣資料」，系統會建立 `data.db` 並下載預報。
+主要程式模組：[`cwa_api.py`](file:///c:/Users/user/Desktop/local_folder/AIoT_L3_CWA_HW1/cwa_api.py)
 
-## CWA Dataset 與 JSON 解析
-
-使用 Dataset `F-D0047-091`：全臺縣市一週天氣預報。API 路徑：
-
+### 2.1 資料集來源
+串接中央氣象署開放資料平臺資料集 **`F-D0047-091`（全臺縣市一週天氣預報）**：
 ```text
 https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-091
 ```
 
-解析流程：
+### 2.2 資料處理流程
+1. **安全連線與請求**：`fetch_cwa_forecast(api_key)` 發送 HTTP GET 請求，統一設定 `REQUEST_TIMEOUT = 30` 秒，並將網路異常或非 200 回應安全封裝為 `CWAError`。
+2. **動態結構解析**：
+   - 走訪 `records.locations[].location[]`，依 `elementName` 建立查找字典，避免使用寫死的固定陣列索引。
+   - 支援欄位大小寫與多種格式相容（例如 `MaxT` / `MaxTemperature` / `最高溫度`、`Wx` / `Weather` / `天氣現象`、`PoP12h` / `PoP` / `降雨機率`、`RH` / `RelativeHumidity` / `相對濕度`）。
+3. **時段精確對齊**：以預報時段（`startTime` 與 `endTime`）為基準，動態配對溫度、天氣現象、降雨機率與濕度。
+4. **容錯設計**：若單一地區缺少部分數值（例如離島缺部分降雨機率），欄位填補 `None`，絕不因局部缺漏中斷整批預報的解析。
+5. **輸出標準化 DataFrame**，欄位統一規範為：
+   `regionName`、`dataDate`、`startTime`、`endTime`、`minTemp`、`maxTemp`、`weather`、`rainProbability`、`humidity`。
 
-1. 從 `records.locations[].location[]` 取得地區。
-2. 依 `elementName` 建立查找表，不使用容易出錯的固定陣列索引。
-3. 以 `MinT`／`MaxT` 的預報時段為基準，依相同時段或時間涵蓋關係配對 `Wx`、`PoP12h`（亦相容 `PoP`／`PoP6h`）與 `RH`。
-4. `elementValue` 可為 list 或 dict；缺少的因子保留為 `NULL`。
-5. 整理成 `regionName`、`dataDate`、`startTime`、`endTime`、`minTemp`、`maxTemp`、`weather`、`rainProbability`、`humidity`。
+---
 
-若 CWA 改變外層包裝、缺少欄位、回傳非 JSON、HTTP 失敗或 timeout，畫面會顯示錯誤，Dashboard 不會因單一 API 錯誤而崩潰。
+## Part 3：SQLite 資料庫持久化與去重儲存 (Database & Deduplication)
 
-## SQLite 資料庫
+主要程式模組：[`database.py`](file:///c:/Users/user/Desktop/local_folder/AIoT_L3_CWA_HW1/database.py)
 
-`data.db` 用來保留下載過的預報，即使 AI 暫時失敗仍可瀏覽天氣。第一次執行會自動建立：
+### 3.1 資料庫結構設計
+系統自動維護本地資料庫檔案 `data.db`，於首次啟動時自動初始化資料表 `WeatherForecasts`：
 
 ```sql
-CREATE TABLE WeatherForecasts (
+CREATE TABLE IF NOT EXISTS WeatherForecasts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     regionName TEXT NOT NULL,
     dataDate TEXT NOT NULL,
@@ -100,60 +143,99 @@ CREATE TABLE WeatherForecasts (
 );
 ```
 
-重複更新使用 SQLite `ON CONFLICT ... DO UPDATE`，同一地區與預報時段只保留一筆並更新最新數值。查詢使用 `WHERE regionName = ?` parameterized query，不拼接 SQL。
+### 3.2 冪等寫入與去重 (Upsert)
+* **唯一性鍵值約束**：以 `(regionName, startTime, endTime)` 建立 `UNIQUE` 約束。
+* **Upsert 更新邏輯**：使用 SQLite 原生 `INSERT INTO ... ON CONFLICT(regionName, startTime, endTime) DO UPDATE SET ...` 語法。多次點擊「更新天氣資料」只會更新最新氣象數據，保證不產生重覆資料紀錄。
+* **安全性防護**：所有查詢一律採用 Parameterized Query（如 `WHERE regionName = ?`），嚴禁字串拼接 SQL，防止潛在 SQL Injection 風險。
 
-## Hugging Face AI 功能
+---
 
-預設模型為 `Qwen/Qwen3.5-9B`，透過官方 `huggingface_hub.InferenceClient` 與自動 Provider 路由產生繁體中文摘要。程式會關閉 Qwen 的 thinking 模式，避免簡短天氣建議被推理 token 用完。
+## Part 4：Streamlit 互動儀表板與視覺化呈現 (Interactive Dashboard)
 
-若目前啟用的 Provider 不支援指定模型，程式會依序嘗試：
+主要程式模組：[`app.py`](file:///c:/Users/user/Desktop/local_folder/AIoT_L3_CWA_HW1/app.py)
 
-1. `Qwen/Qwen3.5-9B`
-2. `openai/gpt-oss-20b`
-3. `google/gemma-3-27b-it`
-
-若要改模型，可在 `.env` 額外加入：
-
-```dotenv
-HF_MODEL=其他可用的聊天模型名稱
+### 4.1 儀表板執行方式
+```powershell
+streamlit run app.py
 ```
 
-Token 缺少、請求逾時、模型暫時不可用或回傳格式不同時，只會顯示「AI 天氣建議目前無法取得」，其他 Dashboard 功能仍可使用。部分 Inference Provider 可能需要額度。
+### 4.2 核心視覺化與互動功能
+* **側邊欄互動篩選 (Sidebar Filters)**：
+  - 支援快速下拉選擇「台灣 22 個縣市」。
+  - 動態連動「預報日期」與「預報時段（日/夜）」。
+  - 「更新天氣資料」按鈕：一鍵發送請求至 CWA API，解析並即時寫入 SQLite。
+* **KPI 關鍵指標卡片**：
+  - 清楚展示當前選定时段的「最低溫」、「最高溫」、「降雨機率」與「相對濕度」。
+* **Altair 溫度區間趨勢圖 (Temperature Band Chart)**：
+  - 以折線圖標示每日最高溫與最低溫走勢。
+  - 使用半透明區間帶（`mark_area`）呈現溫差變化，提供直觀的冷暖趨勢。
+* **Folium 互動式氣象地圖 (Interactive Map)**：
+  - 於台灣地圖上標示各縣市座標位置。
+  - Marker 顏色依據平均氣溫動態呈現（藍色 < 20°C、綠色 20~25°C、橘色 25~30°C、紅色 > 30°C）。
+  - 點擊 Marker 即可彈出詳細天氣現象、氣溫與降雨機率 Tooltip。
+* **原生主題配置**：遵循 `.streamlit/config.toml` 設定，界面美觀清爽，不使用脆弱的客製化 CSS。
 
-## Dashboard 可以做什麼
+---
 
-- 在 sidebar 選擇地區、日期與日夜預報時段。
-- 以帶有趨勢 sparkline 的 KPI 卡查看最低溫、最高溫、降雨機率與濕度。
-- 動態顯示所選地區的 MaxT／MinT 折線與溫度區間。
-- 顯示完整預報資料表。
-- 在 Folium 台灣地圖顯示各縣市預報，Marker 顏色代表平均溫度。
-- 依所選預報產生簡短繁體中文 AI 天氣與生活建議。
-- 按一下按鈕重新下載、解析並更新 SQLite。
-- 使用 `.streamlit/config.toml` 原生主題，不依賴脆弱的自訂 CSS。
+## Part 5：Hugging Face AI 智慧天氣與生活建議 (GenAI Insights & Fallback)
 
-## 測試
+主要程式模組：[`ai_service.py`](file:///c:/Users/user/Desktop/local_folder/AIoT_L3_CWA_HW1/ai_service.py)
 
-離線測試不需要 API Key：
+### 5.1 提示詞工程 (Prompt Engineering)
+系統將所選縣市、氣溫、降雨機率、濕度與天氣現象，組裝成結構化繁體中文 Prompt，約束 LLM：
+1. 依序輸出：**天氣摘要**、**穿著建議**、**是否攜帶雨具**、**戶外活動注意事項**。
+2. 嚴格基於提供數據，不自行臆測無根據數字。
+3. 繁體中文回答，篇幅精準控制在 100～200 字。
+
+### 5.2 模型呼叫與多層級 Fallback 容錯機制
+透過官方 `huggingface_hub.InferenceClient` 呼叫推論服務：
+* **預設模型**：`Qwen/Qwen3.5-9B`（程式自動停用思考模式 `thinking`，節省推理額度並提升回應速度）。
+* **三階段備援模型 (Fallback Chain)**：若預設模型遇上 Provider 負載過高、額度限制或暫不可用，系統自動依序嘗試備援：
+  1. `Qwen/Qwen3.5-9B`
+  2. `openai/gpt-oss-20b`
+  3. `google/gemma-3-27b-it`
+* **故障隔離原則**：AI 呼叫設有獨立例外捕捉。若外部 AI 服務逾時或 Token 額度耗盡，前端僅安全提示「AI 天氣建議目前無法取得」，儀表板、地圖與圖表等其餘功能完全正常運作。
+
+---
+
+## Part 6：系統啟動、自動化測試與驗證 (Testing & Quality Assurance)
+
+### 6.1 執行自動化測試
+專案包含完整的測試套件，涵蓋資料解析、資料庫持久化、UI 元件生成與 AI 備援機制。
+
+執行離線單元測試（無需外部 API Key）：
 
 ```powershell
-pytest -q
-python -m compileall .
+python -m pytest -q
 ```
 
-測試涵蓋 JSON 欄位順序變動、MinT／MaxT／PoP／RH 解析、SQLite 寫入、SQL 查詢、重複更新去重，以及缺少 Key／JSON 結構改變時的錯誤處理。
+### 6.2 測試涵蓋項目
+* **CWA JSON 容錯解析**：驗證欄位順序錯置、大小寫變異、新型態與縮寫欄位能否正確解析。
+* **SQLite 寫入與去重驗證**：驗證連續兩次寫入相同預報時，資料庫筆數維持不變（Upsert 驗證）。
+* **UI 元件渲染測試**：驗證 Altair 溫度區間圖 Layer 結構與 Folium 地圖標記渲染正確性。
+* **AI Prompt 與 Mock 測試**：驗證 Prompt 規範、InferenceClient 呼叫格式與模型 Fallback 順序。
 
-有真實 Token 後，建議再做端到端測試：
+### 6.3 端到端 (E2E) 人工驗證檢查清單
+1. 啟動 Streamlit：`streamlit run app.py`。
+2. 點擊「更新天氣資料」，確認綠色成功通知與資料筆數提示。
+3. 切換左側「地區」與「日期」，確認右側 KPI 卡片、趨勢圖與資料表隨之聯動更新。
+4. 滾動至地圖區域，確認縣市 Marker 顯示正常，且顏色與氣溫對應無誤。
+5. 檢查下方「AI 天氣建議」區塊是否順利生成 100~200 字的繁體中文生活指南。
+6. 暫時清空 `.env` 中的 `HF_TOKEN`，重整確認其他天氣圖表依然正常運作。
 
-1. 啟動 Streamlit 並按「更新天氣資料」。
-2. 切換地區與日期，確認指標、圖表與資料表一起變動。
-3. 點地圖 Marker，確認地區資料正確。
-4. 確認 AI 建議出現；暫時移除 `HF_TOKEN` 後確認其他功能仍正常。
+---
 
-## 常見錯誤
+## Part 7：常見問題與除錯指南 (Troubleshooting & FAQ)
 
-- **找不到 CWA_API_KEY**：確認檔名是 `.env`、變數名稱正確，修改後重新啟動 Streamlit。
-- **401／403**：Key 無效、權限不足或貼入了多餘空白。
-- **CWA timeout**：稍後再按更新；舊資料仍保留於 `data.db`。
-- **資料庫無資料**：至少成功按一次「更新天氣資料」。
-- **AI model unavailable／額度不足**：程式會先自動嘗試備援模型。若仍失敗，請確認 HF Token 的 Inference Providers 權限、已啟用的 Provider 與帳戶額度，或在 `.env` 設定另一個可用聊天模型。
-- **ModuleNotFoundError**：確認已啟用正確虛擬環境並重新執行 `pip install -r requirements.txt`。
+* **Q1: 畫面提示「找不到有效的 CWA_API_KEY」？**
+  * 請確認專案根目錄下已建立檔名為 `.env` 的檔案（非 `.env.example`）。
+  * 確認金鑰名稱為 `CWA_API_KEY`，且前後無多餘引號或空格。修改後請重啟 Streamlit。
+* **Q2: 呼叫氣象 API 遇到 HTTP 401 或 403 錯誤？**
+  * 代表中央氣象署授權碼無效或尚未啟用，請登入 CWA 開放資料平臺重新確認授權碼狀態。
+* **Q3: 首次開啟網頁顯示「目前資料庫內尚無預報資料」？**
+  * 首次執行時 `data.db` 為空，請確認已設定好 `.env`，並於側邊欄點選「更新天氣資料」按鈕。
+* **Q4: AI 建議區塊顯示「AI 天氣建議目前無法取得」？**
+  * 檢查 `HF_TOKEN` 是否已設定並具備 Inference 權限。
+  * 某些開源模型可能因 Hugging Face 伺服器忙碌中或免費額度受限，系統會自動切換至備援模型；您亦可在 `.env` 中指定 `HF_MODEL=其他模型`。
+* **Q5: PowerShell 執行時出現腳本存取被拒錯誤？**
+  * 請在 PowerShell 視窗執行 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` 後再啟用虛擬環境。
